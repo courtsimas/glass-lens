@@ -44,6 +44,8 @@
   <label><b>Depth <output id="o-depth">34</output>px</b><input type="range" id="c-depth" min="6" max="100" value="34"></label>
   <label><b>Curvature <output id="o-curvature">2.2</output></b><input type="range" id="c-curvature" min="5" max="60" value="22"></label>
   <label><b>Chroma <output id="o-chroma">0</output></b><input type="range" id="c-chroma" min="0" max="60" value="0"></label>
+  <label><b>Color</b><input type="color" id="c-tint" value="#ffffff"></label>
+  <label><b>Frost <output id="o-frost">0</output></b><input type="range" id="c-frost" min="0" max="100" value="0"></label>
 </div>
 
 <section class="prose" id="how">
@@ -79,13 +81,17 @@
   const lens = new GlassLens(card, {
     width: 200, height: 130, radius: 52,
     strength: 0.1, depth: 34, curvature: 2.2, chroma: 0,
+    tint: "#ffffff", frost: 0,
     x: 240, y: 160,
     follow: stage,
   });
 
+  // color overlay picker
+  document.getElementById("c-tint").addEventListener("input", (e) => lens.set({ tint: e.target.value }));
+
   // wire the sliders
-  const scale = { strength: (v) => v / 100, curvature: (v) => v / 10, chroma: (v) => v / 100 };
-  for (const key of ["width", "height", "radius", "strength", "depth", "curvature", "chroma"]) {
+  const scale = { strength: (v) => v / 100, curvature: (v) => v / 10, chroma: (v) => v / 100, frost: (v) => v / 100 };
+  for (const key of ["width", "height", "radius", "strength", "depth", "curvature", "chroma", "frost"]) {
     const input = document.getElementById("c-" + key);
     const out = document.getElementById("o-" + key);
     input.addEventListener("input", () => {

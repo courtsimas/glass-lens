@@ -20,6 +20,19 @@
     return n;
   };
 
+  // Resolve any CSS color string to an rgba() with the given alpha, using the
+  // browser's own normalization (handles hex, named, rgb, hsl).
+  let _colorCtx;
+  const toRGBA = (color, alpha) => {
+    if (!_colorCtx) _colorCtx = document.createElement("canvas").getContext("2d");
+    _colorCtx.fillStyle = color;
+    const c = _colorCtx.fillStyle; // "#rrggbb" or "rgba(r, g, b, a)"
+    const [r, g, b] = c[0] === "#"
+      ? [c.slice(1, 3), c.slice(3, 5), c.slice(5, 7)].map((h) => parseInt(h, 16))
+      : c.match(/\d+/g).map(Number);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
   /**
    * Generate a rounded-rect lens displacement map as a PNG data URL.
    * R channel = horizontal shift, G = vertical, 128 = neutral.
@@ -93,6 +106,8 @@
     depth: 34,         // px from the rim over which the bend falls off
     curvature: 2.2,    // falloff exponent — higher = bend hugs the rim
     chroma: 0,         // 0 = single pass; >0 = chromatic fringe via 3 passes
+    tint: "#ffffff",   // color overlay laid over the lens (any CSS color)
+    frost: 0,          // opacity of the tint overlay, 0..1 (0 = no overlay)
     x: 100,            // initial lens center, px relative to target
     y: 80,
     surface: true,     // render the specular/rim overlay div
@@ -297,6 +312,8 @@
         this._surface.style.width = width + "px";
         this._surface.style.height = height + "px";
         this._surface.style.borderRadius = Math.min(radius, width / 2, height / 2) + "px";
+        this._surface.style.backgroundColor =
+          this.opts.frost > 0 ? toRGBA(this.opts.tint, this.opts.frost) : "transparent";
         this._surface.style.transform =
           `translate(${lx + tRect.left - pRect.left}px, ${ly + tRect.top - pRect.top}px)`;
       }

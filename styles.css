@@ -111,6 +111,15 @@ header code { color: var(--sky); font-size: 0.9em; }
 .controls label b { color: var(--paper); font-weight: 500; }
 .controls output { color: var(--sky); }
 input[type="range"] { accent-color: var(--clay); width: 100%; }
+input[type="color"] {
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
 
 /* ---- prose ------------------------------------------------------------- */
 

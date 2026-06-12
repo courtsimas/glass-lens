@@ -59,6 +59,8 @@ it — it's one file with no dependencies, vendoring is the intended distributio
 | `depth`     | `34`    | Distance in px from the rim over which displacement falls to zero  |
 | `curvature` | `2.2`   | Falloff exponent; higher concentrates the bend at the rim          |
 | `chroma`    | `0`     | Spread between per-channel displacement scales; `0` disables the 3-pass chromatic fringe |
+| `tint`      | `#ffffff` | Color overlay laid over the lens; any CSS color                  |
+| `frost`     | `0`     | Opacity of the tint overlay, `0`–`1`; `0` disables it              |
 | `x`, `y`    | —       | Initial lens center, px relative to the target                     |
 | `surface`   | `true`  | Render the specular/rim-light overlay div                          |
 | `follow`    | `null`  | Element; the lens tracks `pointermove` within it                   |
