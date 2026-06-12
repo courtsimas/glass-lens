@@ -50,12 +50,12 @@
     const hw = w / 2, hh = h / 2;
     const rad = Math.min(radius, hw, hh);
 
-    const put = (x, y, dx, dy) => {
+    const put = (x, y, dx, dy, a) => {
       const i = (y * w + x) * 4;
       d[i] = Math.round(128 + dx * 127);
       d[i + 1] = Math.round(128 + dy * 127);
       d[i + 2] = 128;
-      d[i + 3] = 255;
+      d[i + 3] = a;
     };
 
     for (let y = 0; y < Math.ceil(h / 2); y++) {
@@ -74,10 +74,13 @@
           dx = -(nx / len) * m;
           dy = -(ny / len) * m;
         }
-        put(x, y, dx, dy);
-        put(w - 1 - x, y, -dx, dy);
-        put(x, h - 1 - y, dx, -dy);
-        put(w - 1 - x, h - 1 - y, -dx, -dy);
+        // alpha carries the rounded-rect coverage (anti-aliased at the rim) —
+        // the filter uses it as the lens shape mask when one is needed
+        const a = Math.round(Math.max(0, Math.min(1, 0.5 - dist)) * 255);
+        put(x, y, dx, dy, a);
+        put(w - 1 - x, y, -dx, dy, a);
+        put(x, h - 1 - y, dx, -dy, a);
+        put(w - 1 - x, h - 1 - y, -dx, -dy, a);
       }
     }
     ctx.putImageData(img, 0, 0);
@@ -106,6 +109,7 @@
     depth: 34,         // px from the rim over which the bend falls off
     curvature: 2.2,    // falloff exponent — higher = bend hugs the rim
     chroma: 0,         // 0 = single pass; >0 = chromatic fringe via 3 passes
+    blur: 0,           // gaussian blur of the refracted pixels, px (0 = none)
     tint: "#ffffff",   // color overlay laid over the lens (any CSS color)
     frost: 0,          // opacity of the tint overlay, 0..1 (0 = no overlay)
     x: 100,            // initial lens center, px relative to target
@@ -246,7 +250,7 @@
      *   lensResult OVER holedSG → output
      */
     _buildFilter() {
-      const { strength, chroma } = this.opts;
+      const { strength, chroma, blur } = this.opts;
       const f = el("filter", {
         filterUnits: "objectBoundingBox",
         primitiveUnits: "objectBoundingBox",
@@ -284,9 +288,29 @@
         })));
       }
 
-      f.appendChild(lensNode(el("feFlood", { "flood-color": "black", "flood-opacity": 1, result: "lensMask" })));
-      f.appendChild(el("feComposite", { in: "SourceGraphic", in2: "lensMask", operator: "out", result: "holedSG" }));
-      f.appendChild(el("feComposite", { in: "lensResult", in2: "holedSG", operator: "over" }));
+      let lensOut = "lensResult";
+      if (blur > 0) {
+        // Blur the refracted pixels, clipped to the lens subregion (it's a
+        // lensNode, so _position gives it the lens rect). stdDeviation is in
+        // objectBoundingBox fractions so it resolves in WebKit like the rest.
+        const gb = lensNode(el("feGaussianBlur", { in: "lensResult", result: "lensBlur" }));
+        gb.setAttribute("stdDeviation", (blur / this._bbox.width) + " " + (blur / this._bbox.height));
+        f.appendChild(gb);
+        lensOut = "lensBlur";
+      }
+
+      if (blur > 0) {
+        // The rectangle-mask trick below only hides the seam while displaced
+        // and original pixels match at the corners; blur breaks that, so clip
+        // to the real rounded shape carried in the map's alpha channel.
+        f.appendChild(el("feComposite", { in: lensOut, in2: "rawMap", operator: "in", result: "lensShaped" }));
+        f.appendChild(el("feComposite", { in: "SourceGraphic", in2: "rawMap", operator: "out", result: "holedSG" }));
+        lensOut = "lensShaped";
+      } else {
+        f.appendChild(lensNode(el("feFlood", { "flood-color": "black", "flood-opacity": 1, result: "lensMask" })));
+        f.appendChild(el("feComposite", { in: "SourceGraphic", in2: "lensMask", operator: "out", result: "holedSG" }));
+      }
+      f.appendChild(el("feComposite", { in: lensOut, in2: "holedSG", operator: "over" }));
 
       this._defs.appendChild(f);
       if (this._filter) this._filter.remove();

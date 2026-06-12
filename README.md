@@ -59,6 +59,7 @@ it — it's one file with no dependencies, vendoring is the intended distributio
 | `depth`     | `34`    | Distance in px from the rim over which displacement falls to zero  |
 | `curvature` | `2.2`   | Falloff exponent; higher concentrates the bend at the rim          |
 | `chroma`    | `0`     | Spread between per-channel displacement scales; `0` disables the 3-pass chromatic fringe |
+| `blur`      | `0`     | Gaussian blur of the refracted pixels, in px; `0` disables it      |
 | `tint`      | `#ffffff` | Color overlay laid over the lens; any CSS color                  |
 | `frost`     | `0`     | Opacity of the tint overlay, `0`–`1`; `0` disables it              |
 | `x`, `y`    | —       | Initial lens center, px relative to the target                     |
@@ -76,7 +77,8 @@ it — it's one file with no dependencies, vendoring is the intended distributio
 ## How it works
 
 1. **The map.** A small PNG is generated on a canvas from the lens's shape: the red channel
-   encodes horizontal displacement, green vertical, with 128 as neutral. The lens is a
+   encodes horizontal displacement, green vertical, with 128 as neutral, and the alpha channel
+   carries the rounded-rect coverage (used as the shape mask when `blur` is on). The lens is a
    rounded-rect signed-distance field with a configurable falloff from the rim. The map has
    four-fold symmetry, so only the top-left quadrant is computed; the rest is mirrored with
    sign flips.
