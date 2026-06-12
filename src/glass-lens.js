@@ -107,6 +107,9 @@
     constructor(target, options = {}) {
       this.target = target;
       this.opts = Object.assign({}, DEFAULTS, options);
+      // Negative strength inverts the displacement; WebKit renders the inverted
+      // bend with heavy artifacts, so it is clamped off across all browsers.
+      if (this.opts.strength < 0) this.opts.strength = 0;
       this.x = this.opts.x;
       this.y = this.opts.y;
 
@@ -176,6 +179,7 @@
       const shapeKeys = ["width", "height", "radius", "depth", "curvature"];
       const needsMap = shapeKeys.some((k) => k in options && options[k] !== this.opts[k]);
       Object.assign(this.opts, options);
+      if (this.opts.strength < 0) this.opts.strength = 0;
       if (needsMap) this._rebuildMap();
       else if (this._mapURL) this._buildFilter();
     }

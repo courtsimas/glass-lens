@@ -55,7 +55,7 @@ it — it's one file with no dependencies, vendoring is the intended distributio
 | `width`     | `200`   | Lens width in px                                                   |
 | `height`    | `130`   | Lens height in px                                                  |
 | `radius`    | `52`    | Lens corner radius in px                                           |
-| `strength`  | `0.1`   | Displacement scale, as a fraction of the target's bounding box. Negative inverts the bend direction |
+| `strength`  | `0.1`   | Displacement scale, as a fraction of the target's bounding box. Clamped to a minimum of `0` |
 | `depth`     | `34`    | Distance in px from the rim over which displacement falls to zero  |
 | `curvature` | `2.2`   | Falloff exponent; higher concentrates the bend at the rim          |
 | `chroma`    | `0`     | Spread between per-channel displacement scales; `0` disables the 3-pass chromatic fringe |
