@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>glass-lens — cross-browser refraction for live DOM</title>
+<meta name="description" content="A zero-dependency glass refraction lens that bends real DOM pixels with one SVG filter. Works in Chromium, Safari, and Firefox.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">glass-lens</p>
+  <h1>Refraction for live DOM, in every browser</h1>
+  <p>One SVG <code>feDisplacementMap</code>, a generated lens map, and the unit system every
+  browser actually understands. No canvas, no clones, no WebGL, no flags — the glass bends the
+  page's own pixels, so text stays selectable and links stay clickable straight through the lens.</p>
+</header>
+
+<div class="stage" id="stage">
+  <div class="card" id="card">
+    <div class="band"></div>
+    <div class="body">
+      <h2>Move your pointer over this card</h2>
+      <div class="chips">
+        <span class="fill">refraction</span><span>zero dependencies</span>
+        <span>Chromium ✓</span><span>Safari ✓</span><span>Firefox ✓</span>
+      </div>
+      <p>Everything under the lens is real, rendered DOM. Try drag-selecting this paragraph
+      through the distortion, or clicking <a href="#how" >this link</a>. The effect samples
+      nothing from behind a pane — the content's own pixels are the ones moving.</p>
+      <div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <label><b>Width <output id="o-width">200</output>px</b><input type="range" id="c-width" min="80" max="340" value="200"></label>
+  <label><b>Height <output id="o-height">130</output>px</b><input type="range" id="c-height" min="60" max="240" value="130"></label>
+  <label><b>Radius <output id="o-radius">52</output>px</b><input type="range" id="c-radius" min="6" max="120" value="52"></label>
+  <label><b>Strength <output id="o-strength">0.1</output></b><input type="range" id="c-strength" min="-30" max="30" value="10"></label>
+  <label><b>Depth <output id="o-depth">34</output>px</b><input type="range" id="c-depth" min="6" max="100" value="34"></label>
+  <label><b>Curvature <output id="o-curvature">2.2</output></b><input type="range" id="c-curvature" min="5" max="60" value="22"></label>
+  <label><b>Chroma <output id="o-chroma">0</output></b><input type="range" id="c-chroma" min="0" max="60" value="0"></label>
+</div>
+
+<section class="prose" id="how">
+  <h3>How it works</h3>
+  <p>The lens map is a small PNG generated on a canvas: its red channel encodes horizontal
+  displacement, green encodes vertical, and 128 means "don't move." An SVG filter loads it with
+  <code>feImage</code>, composites it over neutral gray, and hands it to
+  <code>feDisplacementMap</code>, which bends the element's own rendered pixels. A final mask
+  sandwich — punch a lens-shaped hole in the original, lay the displaced result over it — keeps
+  the effect confined to the lens with an invisible seam.</p>
+  <p>The cross-browser trick is a single attribute: every geometric value in the filter is
+  expressed in <code>objectBoundingBox</code> fractions. WebKit cannot resolve
+  <code>userSpaceOnUse</code> pixel geometry for filter primitives applied to HTML elements —
+  feImage and primitive subregions silently fail — but in bounding-box fractions the entire
+  primitive set works. Two more details keep the result identical across browsers: the map image
+  is fully decoded before the filter attaches, and the filter gets a fresh ID on every update, so
+  no browser serves stale cached filter output.</p>
+  <p>Moving the lens is nearly free. The map never regenerates on movement — only the fractional
+  subregions of three primitives shift. The map is rebuilt only when the lens changes shape, and
+  even then only one quadrant is computed; the rest is mirrored.</p>
+</section>
+
+<footer>
+  MIT licensed. An independent, from-scratch implementation of cross-browser SVG glass refraction.
+</footer>
+
+<script src="src/glass-lens.js"></script>
+<script>
+  const card = document.getElementById("card");
+  const stage = document.getElementById("stage");
+
+  const lens = new GlassLens(card, {
+    width: 200, height: 130, radius: 52,
+    strength: 0.1, depth: 34, curvature: 2.2, chroma: 0,
+    x: 240, y: 160,
+    follow: stage,
+  });
+
+  // wire the sliders
+  const scale = { strength: (v) => v / 100, curvature: (v) => v / 10, chroma: (v) => v / 100 };
+  for (const key of ["width", "height", "radius", "strength", "depth", "curvature", "chroma"]) {
+    const input = document.getElementById("c-" + key);
+    const out = document.getElementById("o-" + key);
+    input.addEventListener("input", () => {
+      const v = (scale[key] || ((x) => x))(+input.value);
+      out.textContent = v;
+      lens.set({ [key]: v });
+    });
+  }
+</script>
+</body>
+</html>
