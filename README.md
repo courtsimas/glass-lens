@@ -21,10 +21,24 @@ npx serve
 (Opening the file directly via `file://` works in most browsers too, but a server avoids
 local-file quirks.)
 
+## Install
+
+From npm:
+
+```sh
+npm install glass-lens
+```
+
+Or load it straight from a CDN — no install, no build:
+
+```html
+<script src="https://unpkg.com/glass-lens"></script>
+```
+
 ## Usage
 
 ```html
-<script src="src/glass-lens.js"></script>
+<script src="https://unpkg.com/glass-lens"></script>
 <script>
   const lens = new GlassLens(document.querySelector("#card"), {
     width: 200,       // lens size, px
@@ -45,8 +59,9 @@ local-file quirks.)
 ```
 
 The file is UMD-style: it attaches `GlassLens` to `window` in a plain script tag and exports
-via `module.exports` under CommonJS. For ESM projects, import it and grab the global, or wrap
-it — it's one file with no dependencies, vendoring is the intended distribution.
+via `module.exports` under CommonJS (`const GlassLens = require("glass-lens")`). For ESM
+projects, import it and grab the global, or wrap it — it's one file with no dependencies, so
+vendoring the script directly works just as well.
 
 ### Options
 

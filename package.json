@@ -1,0 +1,36 @@
+{
+  "name": "glass-lens",
+  "version": "1.0.0",
+  "description": "Cross-browser glass refraction for live DOM — one SVG filter bends the page's own rendered pixels. Zero dependencies, no build step.",
+  "main": "src/glass-lens.js",
+  "unpkg": "src/glass-lens.js",
+  "jsdelivr": "src/glass-lens.js",
+  "files": [
+    "src/glass-lens.js"
+  ],
+  "scripts": {
+    "start": "npx serve"
+  },
+  "keywords": [
+    "glass",
+    "liquid-glass",
+    "refraction",
+    "svg-filter",
+    "displacement-map",
+    "feDisplacementMap",
+    "lens",
+    "frosted-glass",
+    "ui",
+    "effect"
+  ],
+  "author": "Court Simas (https://github.com/courtsimas)",
+  "license": "MIT",
+  "homepage": "https://courtsimas.github.io/glass-lens/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/courtsimas/glass-lens.git"
+  },
+  "bugs": {
+    "url": "https://github.com/courtsimas/glass-lens/issues"
+  }
+}
