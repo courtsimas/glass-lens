@@ -49,6 +49,7 @@ header code { color: var(--sky); font-size: 0.9em; }
   width: min(880px, 100%);
   cursor: crosshair;
   touch-action: none;
+  overflow: hidden;
 }
 
 .card { background: var(--paper); color: var(--ink); border-radius: 18px; overflow: hidden; }

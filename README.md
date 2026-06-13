@@ -83,7 +83,9 @@ vendoring the script directly works just as well.
 
 ### Methods
 
-- `moveTo(x, y)` — move the lens center (px, relative to the target). rAF-throttled.
+- `moveTo(x, y, clampRect?)` — move the lens center (px, relative to the target). rAF-throttled.
+  Pass a viewport-space `clampRect` (e.g. from `getBoundingClientRect`) to keep the whole lens
+  inside it; the `follow` option does this automatically against the followed element.
 - `set(options)` — update any option. Shape options (`width`, `height`, `radius`, `depth`,
   `curvature`) regenerate the displacement map; `strength` and `chroma` only rebuild the filter
   graph; everything else is a cheap reposition.

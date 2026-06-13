@@ -1,6 +1,6 @@
 {
   "name": "glass-lens",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Cross-browser glass refraction for live DOM — one SVG filter bends the page's own rendered pixels. Zero dependencies, no build step.",
   "main": "src/glass-lens.js",
   "unpkg": "src/glass-lens.js",

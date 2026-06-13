@@ -179,8 +179,19 @@
       this._rebuildMap();
     }
 
-    /** Move the lens center to (x, y) in px relative to the target element. */
-    moveTo(x, y) {
+    /**
+     * Move the lens center to (x, y) in px relative to the target element.
+     * If clampRect (a viewport-space rect, e.g. from getBoundingClientRect) is
+     * given, the center is constrained so the whole lens stays inside it.
+     * rAF-throttled.
+     */
+    moveTo(x, y, clampRect) {
+      if (clampRect) {
+        const { width, height } = this.opts;
+        const t = this.target.getBoundingClientRect();
+        x = Math.min(Math.max(x, clampRect.left - t.left + width / 2), clampRect.right - t.left - width / 2);
+        y = Math.min(Math.max(y, clampRect.top - t.top + height / 2), clampRect.bottom - t.top - height / 2);
+      }
       this.x = x;
       this.y = y;
       if (this._raf) return;
