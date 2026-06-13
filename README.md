@@ -91,6 +91,49 @@ vendoring the script directly works just as well.
   graph; everything else is a cheap reposition.
 - `destroy()` — remove the filter, overlay, and listeners.
 
+### Recipe: glass on a segmented control
+
+The pointer-follow demo is eye-catching, but the more useful pattern is a *static* lens pinned to
+a real component — a glass pill that glides between segments on select, the way native iOS does it.
+Drop the `follow` option, size the lens to one segment, and animate `moveTo` on change. The target
+is the whole control, so the glass refracts the control's own pixels and every button stays
+clickable. (See it live in the [demo](https://courtsimas.github.io/glass-lens/).)
+
+```js
+const control = document.querySelector("#segmented");
+const tabs = [...control.querySelectorAll(".seg")];
+
+// a static frosted pill — note: no `follow`
+const lens = new GlassLens(control, { strength: 0.11, frost: 0.12, tint: "#ffffff" });
+
+// segment geometry in coordinates relative to the control
+const geom = (tab) => {
+  const c = control.getBoundingClientRect();
+  const b = tab.getBoundingClientRect();
+  return { x: b.left - c.left + b.width / 2, y: b.top - c.top + b.height / 2, w: b.width, h: b.height };
+};
+
+// size the pill to a segment, then snap it onto the active tab
+const g = geom(tabs[0]);
+lens.set({ width: g.w, height: g.h, radius: g.h / 2 });
+lens.moveTo(geom(control.querySelector(".is-active")).x, g.y);
+
+// ease it across on select (filter + specular highlight move together)
+tabs.forEach((tab) => tab.addEventListener("click", () => {
+  tabs.forEach((t) => t.classList.toggle("is-active", t === tab));
+  const startX = lens.x, dx = geom(tab).x - startX, cy = geom(tab).y, t0 = performance.now();
+  const step = (now) => {
+    const t = Math.min((now - t0) / 480, 1);
+    lens.moveTo(startX + dx * (1 - Math.pow(1 - t, 3)), cy);  // easeOutCubic
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}));
+```
+
+Give the track some texture (a gradient, not a flat fill) — refraction only reads when there's
+something under the glass worth bending.
+
 ## How it works
 
 1. **The map.** A small PNG is generated on a canvas from the lens's shape: the red channel

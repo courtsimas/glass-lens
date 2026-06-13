@@ -49,6 +49,19 @@
   <label><b>Frost <output id="o-frost">0</output></b><input type="range" id="c-frost" min="0" max="100" value="0"></label>
 </div>
 
+<section class="seg-demo">
+  <h3>Pinned to a real component</h3>
+  <p>No pointer required. Here the lens is a <em>static</em> glass pill sized to one segment of a
+  segmented control; selecting a tab glides it across the control's own pixels — the same pattern
+  native iOS uses. Cross-browser, and every tab stays clickable straight through the glass.</p>
+  <div class="segmented" id="segmented" role="tablist" aria-label="View range">
+    <button class="seg is-active" type="button" role="tab">Day</button>
+    <button class="seg" type="button" role="tab">Week</button>
+    <button class="seg" type="button" role="tab">Month</button>
+    <button class="seg" type="button" role="tab">Year</button>
+  </div>
+</section>
+
 <section class="prose" id="how">
   <h3>How it works</h3>
   <p>The lens map is a small PNG generated on a canvas: its red channel encodes horizontal
@@ -101,6 +114,56 @@
       lens.set({ [key]: v });
     });
   }
+
+  // --- segmented control: a static glass pill that glides on select -------
+  const seg = document.getElementById("segmented");
+  const segBtns = [...seg.querySelectorAll(".seg")];
+  const segLens = new GlassLens(seg, {
+    width: 10, height: 10, radius: 10,   // real size set once layout is known
+    strength: 0.11, depth: 16, curvature: 2.6,
+    blur: 0, tint: "#ffffff", frost: 0.12,
+    x: 0, y: 0,
+  });
+
+  // geometry of a segment, in coordinates relative to the control
+  const segGeom = (btn) => {
+    const c = seg.getBoundingClientRect();
+    const b = btn.getBoundingClientRect();
+    return { x: b.left - c.left + b.width / 2, y: b.top - c.top + b.height / 2, w: b.width, h: b.height };
+  };
+
+  let segX = 0, segCY = 0, segRAF = null;
+
+  // size the pill to a segment and snap it onto the active one
+  const alignActive = () => {
+    const g = segGeom(segBtns[0]);
+    segCY = g.y;
+    segLens.set({ width: g.w, height: g.h, radius: g.h / 2 });
+    segX = segGeom(seg.querySelector(".seg.is-active")).x;
+    segLens.moveTo(segX, segCY);
+  };
+
+  // ease the pill across to a tab (filter + surface move together each frame)
+  const glideTo = (btn) => {
+    const startX = segX, dx = segGeom(btn).x - startX, t0 = performance.now();
+    if (segRAF) cancelAnimationFrame(segRAF);
+    const step = (now) => {
+      const t = Math.min((now - t0) / 480, 1);
+      segX = startX + dx * (1 - Math.pow(1 - t, 3));   // easeOutCubic
+      segLens.moveTo(segX, segCY);
+      if (t < 1) segRAF = requestAnimationFrame(step);
+    };
+    segRAF = requestAnimationFrame(step);
+  };
+
+  segBtns.forEach((btn) => btn.addEventListener("click", () => {
+    segBtns.forEach((b) => b.classList.toggle("is-active", b === btn));
+    glideTo(btn);
+  }));
+
+  alignActive();
+  addEventListener("resize", alignActive);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(alignActive);
 </script>
 </body>
 </html>
