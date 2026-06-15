@@ -240,7 +240,7 @@
     _measure(reposition) {
       const r = this.target.getBoundingClientRect();
       this._bbox = { width: Math.max(r.width, 1), height: Math.max(r.height, 1) };
-      if (reposition && this._mapURL) { this._position(); this._mintId(); }
+      if (reposition && this._mapURL) this._position();
     }
 
     _rebuildMap() {
@@ -340,7 +340,6 @@
       if (this._filter) this._filter.remove();
       this._filter = f;
       this._position();
-      this._mintId();
     }
 
     _position() {
@@ -366,6 +365,11 @@
         this._surface.style.transform =
           `translate(${lx + tRect.left - pRect.left}px, ${ly + tRect.top - pRect.top}px)`;
       }
+      // WebKit caches filter output by id and will NOT repaint when only the
+      // primitive subregion attributes change — so a fresh id per reposition is
+      // required for the lens to track movement. (Yes, this re-renders the graph
+      // each frame; it's the price of correct movement in Safari.)
+      this._mintId();
     }
 
     // Browsers cache filter output by ID — including stale or pre-decode

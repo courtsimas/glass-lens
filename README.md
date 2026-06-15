@@ -211,12 +211,12 @@ behaves identically in every browser.
 - **Decode before attach.** A browser may resolve `feImage` at first paint; if the data-URL PNG
   hasn't decoded yet, it can cache an empty result against the filter ID and never re-read it.
   The library awaits `img.decode()` before the filter touches the DOM.
-- **Fresh ID on content change.** Browsers cache filter output by filter ID, including stale or
-  pre-decode results. When the filter graph or the map changes, the filter is renamed and
-  `filter: url(#...)` repointed (a cheap attribute swap) to force a clean repaint. Plain movement
-  only mutates the subregion attributes — it does *not* re-mint, so panning the lens stays cheap.
-  If the *target's own content* changes underneath a static lens (e.g. scrolling), call `refresh()`
-  to re-mint and repaint against the new pixels.
+- **Fresh ID per update.** WebKit caches filter output by filter ID and will *not* repaint when
+  only primitive subregion attributes change — so every reposition renames the filter and repoints
+  `filter: url(#...)` (a cheap attribute swap, not a DOM rebuild) to force a clean repaint. This is
+  what makes the lens track movement in Safari. If the *target's own content* changes underneath a
+  static lens (e.g. scrolling) without the lens moving, call `refresh()` to re-mint and repaint
+  against the new pixels.
 - **Source-graphic size ceiling.** Browsers limit how large a filtered element can be before
   they tile the output into mismatched blocks or drop the effect entirely. The limit is
   undocumented and varies by version and platform. Keep the refracted element modest — a card,
