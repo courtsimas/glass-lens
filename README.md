@@ -89,6 +89,9 @@ vendoring the script directly works just as well.
 - `set(options)` — update any option. Shape options (`width`, `height`, `radius`, `depth`,
   `curvature`) regenerate the displacement map; `strength` and `chroma` only rebuild the filter
   graph; everything else is a cheap reposition.
+- `refresh()` — force a clean re-render without rebuilding the filter graph (a cheap id swap).
+  Call it when the *target's own content* changed but the lens didn't move — e.g. content scrolling
+  under a static lens — so an engine that caches filter output by id repaints against the new pixels.
 - `destroy()` — remove the filter, overlay, and listeners.
 
 ### Recipe: glass on a segmented control
@@ -134,12 +137,47 @@ tabs.forEach((tab) => tab.addEventListener("click", () => {
 Give the track some texture (a gradient, not a flat fill) — refraction only reads when there's
 something under the glass worth bending.
 
+### Recipe: glass nav over a scrolling page
+
+Because the lens refracts an element's *own* pixels (not the backdrop behind it), a "glass nav that
+refracts the page scrolling behind it" is built by flipping the usual setup: make the **scroll
+container** the target, pin a **static lens** to the top of it, and lay the nav labels as a crisp
+overlay on top. As the content scrolls inside the container, the top strip refracts whatever passes
+under it. Call `refresh()` on scroll so the refraction tracks the moving content.
+
+```js
+const scroller = document.querySelector("#page");   // overflow:auto, fixed height
+const lens = new GlassLens(scroller, {
+  width: scroller.clientWidth - 32, height: 56, radius: 28,
+  x: scroller.clientWidth / 2, y: 44,               // a bar pinned at the top
+  strength: 0.12, frost: 0.1, tint: "#ffffff",
+});
+scroller.addEventListener("scroll", () => {
+  // rAF-throttle in real code
+  lens.refresh();
+}, { passive: true });
+```
+
+**Does this scale to a big, heavy page?** No — and that's important. A CSS `filter: url()` on a
+large scroll container makes the browser rasterize that element's whole content to feed the filter
+(on the CPU, for ordinary HTML), and that cost scales with the *content's* size and complexity, not
+with the small visible bar. It's off the compositor's fast scroll path, and `contain` /
+`content-visibility` can't scope it (a filter must read pixels outside the visible strip). It's fine
+for a **bounded panel** like the demo, but not for a full, heavy production page. For that:
+
+- **Frosted (blur) nav, no refraction:** use CSS `backdrop-filter: blur()` (with `-webkit-` for
+  Safari). It's compositor-level, cross-browser Baseline, and scales because it only filters the
+  small backdrop under the bar — not the whole document. glass-lens isn't needed for that look.
+- **Refraction on a heavy page:** keep the filtered element *small*. Apply the lens to a fixed-size
+  strip the height of the nav (optionally a scroll-synced clone of the slice behind it) so the
+  rasterized buffer stays bar-sized regardless of page length.
+
 ## How it works
 
 1. **The map.** A small PNG is generated on a canvas from the lens's shape: the red channel
    encodes horizontal displacement, green vertical, with 128 as neutral, and the alpha channel
-   carries the rounded-rect coverage (used as the shape mask when `blur` is on). The lens is a
-   rounded-rect signed-distance field with a configurable falloff from the rim. The map has
+   carries the anti-aliased rounded-rect coverage, which is used as the lens's shape mask. The lens
+   is a rounded-rect signed-distance field with a configurable falloff from the rim. The map has
    four-fold symmetry, so only the top-left quadrant is computed; the rest is mirrored with
    sign flips.
 
@@ -148,11 +186,13 @@ something under the glass worth bending.
    the element's real rendered pixels. Nothing is sampled from behind the element; the
    content's own pixels move, which is why selection and clicks survive.
 
-3. **The mask sandwich.** The displaced result is clipped to the lens subregion. A black
-   `feFlood` of the same subregion punches a hole in the original (`feComposite operator="out"`),
-   and the displaced result is composited back over the hole. The mask is a plain rectangle —
-   the rounded corners come free, because the map is neutral at the corners, so displaced and
-   original pixels are identical there and the seam is invisible.
+3. **The mask sandwich.** The displaced result is clipped to the lens's true rounded shape using
+   the map's alpha channel (`feComposite operator="in"`), and an identically-shaped hole is punched
+   in the original (`feComposite operator="out"` against the same map). The two are composited
+   back together, so the rounded edge of the fill and of the hole coincide — no seam. (An earlier
+   version faked the rounded corners with a plain rectangle and relied on the map being a bit-exact
+   no-op at the corners; older Chromium's `feDisplacementMap` doesn't treat neutral as an exact
+   zero shift, so the square corners leaked. The explicit alpha mask removes that dependency.)
 
 4. **Movement is nearly free.** Sliding the lens updates the fractional subregion (x/y/width/
    height) of three primitives. The map itself never regenerates on movement, only on shape
@@ -171,9 +211,12 @@ behaves identically in every browser.
 - **Decode before attach.** A browser may resolve `feImage` at first paint; if the data-URL PNG
   hasn't decoded yet, it can cache an empty result against the filter ID and never re-read it.
   The library awaits `img.decode()` before the filter touches the DOM.
-- **Fresh ID per update.** Browsers cache filter output by filter ID, including stale output
-  when only primitive attributes change. Every update renames the filter and repoints
-  `filter: url(#...)`. This is an attribute swap, not a DOM rebuild — it's cheap.
+- **Fresh ID on content change.** Browsers cache filter output by filter ID, including stale or
+  pre-decode results. When the filter graph or the map changes, the filter is renamed and
+  `filter: url(#...)` repointed (a cheap attribute swap) to force a clean repaint. Plain movement
+  only mutates the subregion attributes — it does *not* re-mint, so panning the lens stays cheap.
+  If the *target's own content* changes underneath a static lens (e.g. scrolling), call `refresh()`
+  to re-mint and repaint against the new pixels.
 - **Source-graphic size ceiling.** Browsers limit how large a filtered element can be before
   they tile the output into mismatched blocks or drop the effect entirely. The limit is
   undocumented and varies by version and platform. Keep the refracted element modest — a card,
@@ -188,6 +231,12 @@ Chromium, Firefox, and Safari (macOS and iOS), current releases. The technique d
 loudly rather than gracefully in very old browsers (pre-GPU-filter-pipeline builds may render
 the element without the effect); if you need to gate it, feature-detect with a 1×1 probe or
 gate on `CSS.supports("filter", "url(#x)")` plus a version check.
+
+One known WebKit caveat: Safari 26.2 and earlier can render the whole filter offset *below* the
+lens and is markedly slower at the filter pipeline. WebKit fixed both in 26.4 ("Fixed tiling gaps
+in CSS reference filters using `<feDisplacementMap>`" and "Improved drop-shadow and blur effects
+rendering performance"), so the cross-browser-correct code here is right on 26.4+ — the fix for
+affected users is to update Safari.
 
 ## Prior art
 

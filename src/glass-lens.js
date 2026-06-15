@@ -214,6 +214,16 @@
       else if (this._mapURL) this._buildFilter();
     }
 
+    /**
+     * Force a clean re-render of the filter without rebuilding its graph.
+     * Cheap (an id swap). Call it when the TARGET's own content changed but the
+     * lens did not move — e.g. content scrolling under a static lens — so a
+     * browser that caches filter output by id repaints against the new pixels.
+     */
+    refresh() {
+      if (this._filter) this._mintId();
+    }
+
     /** Remove the filter, overlay, and listeners. */
     destroy() {
       this._destroyed = true;
@@ -230,7 +240,7 @@
     _measure(reposition) {
       const r = this.target.getBoundingClientRect();
       this._bbox = { width: Math.max(r.width, 1), height: Math.max(r.height, 1) };
-      if (reposition && this._mapURL) this._position();
+      if (reposition && this._mapURL) { this._position(); this._mintId(); }
     }
 
     _rebuildMap() {
@@ -256,9 +266,9 @@
      *
      *   feFlood(gray) ─┐
      *   feImage(map) ──┴→ composite → feDisplacementMap (lens subregion) → lensResult
-     *   feFlood(black, lens subregion) → lensMask
-     *   SourceGraphic OUT lensMask → holedSG
-     *   lensResult OVER holedSG → output
+     *   lensResult [→ feGaussianBlur] IN rawMap(alpha) → lensShaped
+     *   SourceGraphic OUT rawMap(alpha) → holedSG
+     *   lensShaped OVER holedSG → output
      */
     _buildFilter() {
       const { strength, chroma, blur } = this.opts;
@@ -301,32 +311,36 @@
 
       let lensOut = "lensResult";
       if (blur > 0) {
-        // Blur the refracted pixels, clipped to the lens subregion (it's a
-        // lensNode, so _position gives it the lens rect). stdDeviation is in
-        // objectBoundingBox fractions so it resolves in WebKit like the rest.
-        const gb = lensNode(el("feGaussianBlur", { in: "lensResult", result: "lensBlur" }));
-        gb.setAttribute("stdDeviation", (blur / this._bbox.width) + " " + (blur / this._bbox.height));
+        // Blur the refracted pixels. The blur carries NO primitive subregion
+        // (it is not a lensNode): older WebKit mis-positions an
+        // objectBoundingBox subregion on feGaussianBlur and drops the output
+        // below the lens. It inherits lensResult's region instead, and the
+        // rounded clip below contains the halo. stdDeviation is normalized by
+        // the bbox diagonal — the way objectBoundingBox primitiveUnits
+        // actually resolves it — so the blur is isotropic, not stretched.
+        const gb = el("feGaussianBlur", { in: "lensResult", result: "lensBlur" });
+        const diag = Math.sqrt((this._bbox.width * this._bbox.width + this._bbox.height * this._bbox.height) / 2);
+        gb.setAttribute("stdDeviation", blur / diag);
         f.appendChild(gb);
         lensOut = "lensBlur";
       }
 
-      if (blur > 0) {
-        // The rectangle-mask trick below only hides the seam while displaced
-        // and original pixels match at the corners; blur breaks that, so clip
-        // to the real rounded shape carried in the map's alpha channel.
-        f.appendChild(el("feComposite", { in: lensOut, in2: "rawMap", operator: "in", result: "lensShaped" }));
-        f.appendChild(el("feComposite", { in: "SourceGraphic", in2: "rawMap", operator: "out", result: "holedSG" }));
-        lensOut = "lensShaped";
-      } else {
-        f.appendChild(lensNode(el("feFlood", { "flood-color": "black", "flood-opacity": 1, result: "lensMask" })));
-        f.appendChild(el("feComposite", { in: "SourceGraphic", in2: "lensMask", operator: "out", result: "holedSG" }));
-      }
-      f.appendChild(el("feComposite", { in: lensOut, in2: "holedSG", operator: "over" }));
+      // Clip the lens to its true rounded shape using the map's alpha channel,
+      // and punch an identically-shaped hole in the original. This single path
+      // serves blur and non-blur alike. (The old non-blur "rectangle mask"
+      // relied on the map being a bit-exact no-op at the corners so the square
+      // subregion stayed invisible — but older Chromium's feDisplacementMap
+      // does not treat neutral 128 as an exact zero shift, so the square
+      // corners leaked. The explicit alpha mask removes that dependency.)
+      f.appendChild(el("feComposite", { in: lensOut, in2: "rawMap", operator: "in", result: "lensShaped" }));
+      f.appendChild(el("feComposite", { in: "SourceGraphic", in2: "rawMap", operator: "out", result: "holedSG" }));
+      f.appendChild(el("feComposite", { in: "lensShaped", in2: "holedSG", operator: "over" }));
 
       this._defs.appendChild(f);
       if (this._filter) this._filter.remove();
       this._filter = f;
       this._position();
+      this._mintId();
     }
 
     _position() {
@@ -352,7 +366,6 @@
         this._surface.style.transform =
           `translate(${lx + tRect.left - pRect.left}px, ${ly + tRect.top - pRect.top}px)`;
       }
-      this._mintId();
     }
 
     // Browsers cache filter output by ID — including stale or pre-decode

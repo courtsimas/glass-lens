@@ -20,6 +20,9 @@
 </header>
 
 <div class="stage" id="stage">
+  <!-- a non-filtered clip parent: older Chromium doesn't clip a filtered
+       element to its own border-radius, but it does clip to an ancestor's -->
+  <div class="card-clip">
   <div class="card" id="card">
     <div class="band"></div>
     <div class="body">
@@ -33,6 +36,7 @@
       nothing from behind a pane — the content's own pixels are the ones moving.</p>
       <div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
     </div>
+  </div>
   </div>
 </div>
 
@@ -60,6 +64,50 @@
     <button class="seg" type="button" role="tab">Month</button>
     <button class="seg" type="button" role="tab">Year</button>
   </div>
+</section>
+
+<section class="scroll-demo">
+  <h3>Glass navigation over a scrolling page</h3>
+  <p>A real-world layout: a bar fixed to the top of a scrolling page, with the content sliding
+  behind it picking up the glass. Scroll inside the frame — the bar refracts whatever passes under
+  it, live. Cross-browser, no <code>backdrop-filter</code>. (One caveat below on how this scales.)</p>
+  <div class="page-frame" id="pageFrame">
+    <div class="page-scroll" id="pageScroll">
+      <div class="page-inner">
+        <h4>The Aurora Field Guide</h4>
+        <p>Scroll this panel. The glass bar above stays put while the article travels underneath
+        it, refracting through the lens as it goes.</p>
+        <div class="block block-a">Northern Lights</div>
+        <p>Auroras form when charged particles from the sun collide with gases high in the
+        atmosphere. Greens come from oxygen near 100&nbsp;km; reds from oxygen much higher up;
+        blues and violets from nitrogen.</p>
+        <h5>Where to look</h5>
+        <p>The band of best viewing sits roughly between 65&deg; and 72&deg; magnetic latitude —
+        a ring over northern Canada, Iceland, Norway, and Siberia.</p>
+        <div class="block block-b">Solar Wind</div>
+        <p>Activity tracks the eleven-year solar cycle. Near the peak, displays push to lower
+        latitudes and turn brighter and more frequent.</p>
+        <h5>Reading the forecast</h5>
+        <p>The Kp index runs 0–9. A Kp of 5 or more means a geomagnetic storm and a real chance of
+        color overhead far from the poles.</p>
+        <div class="block block-c">Long Exposure</div>
+        <p>A tripod and a multi-second exposure pull out color the eye can barely register. Start
+        near f/2.8, ISO 1600, 10 seconds, and adjust from there.</p>
+        <p>Keep scrolling — the refraction tracks every line of this text as it slides under the
+        bar, because the glass is bending the page's own pixels.</p>
+        <h5>One more thing</h5>
+        <p>The bar isn't sampling a blurred backdrop. It's the same SVG displacement filter from the
+        demos above, pinned to the top of this scroll container and refreshed as you scroll.</p>
+      </div>
+    </div>
+    <div class="glass-nav" id="glassNav">
+      <span class="brand">✦ Aurora</span>
+      <span class="navlinks"><a href="#how">Guide</a><a href="#how">Sky</a><a href="#how">Gear</a></span>
+    </div>
+  </div>
+  <p class="note">Scales fine for a contained panel like this. For a <em>full, heavy</em> page, see
+  the note in the README — putting an SVG filter on a large scroll container forces the browser to
+  re-rasterize its content, so a production glass nav is better done with a small fixed strip.</p>
 </section>
 
 <section class="prose" id="how">
@@ -164,6 +212,48 @@
   alignActive();
   addEventListener("resize", alignActive);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(alignActive);
+
+  // --- glass nav over a scrolling page: a STATIC lens pinned to the top ---
+  // --- of a scroll container; the page refracts as it slides underneath ---
+  const pageScroll = document.getElementById("pageScroll");
+  const glassNav = document.getElementById("glassNav");
+  const NAV = { top: 16, height: 56, inset: 16, radius: 28 };
+
+  const navGeom = () => {
+    const w = pageScroll.clientWidth;
+    return {
+      x: w / 2, y: NAV.top + NAV.height / 2,
+      width: w - NAV.inset * 2, height: NAV.height, radius: NAV.radius,
+    };
+  };
+
+  const navLens = new GlassLens(pageScroll, Object.assign(navGeom(), {
+    strength: 0.12, depth: 14, curvature: 2.6,
+    tint: "#ffffff", frost: 0.1,
+  }));
+
+  // size the glass bar + its label overlay to the frame
+  const layoutNav = () => {
+    const g = navGeom();
+    navLens.set({ width: g.width, height: g.height, radius: g.radius });
+    navLens.moveTo(g.x, g.y);
+    Object.assign(glassNav.style, {
+      left: NAV.inset + "px", top: NAV.top + "px",
+      width: g.width + "px", height: g.height + "px", borderRadius: g.radius + "px",
+    });
+  };
+
+  // the lens never moves; refresh it on scroll so the refraction tracks the
+  // content passing under it (forces a repaint where filter output is cached)
+  let navScrollRAF = null;
+  pageScroll.addEventListener("scroll", () => {
+    if (navScrollRAF) return;
+    navScrollRAF = requestAnimationFrame(() => { navScrollRAF = null; navLens.refresh(); });
+  }, { passive: true });
+
+  layoutNav();
+  addEventListener("resize", layoutNav);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutNav);
 </script>
 </body>
 </html>
